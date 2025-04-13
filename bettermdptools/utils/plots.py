@@ -20,7 +20,7 @@ class Plots:
     def v_iters_plot(data, title, show=True):
         df = pd.DataFrame(data=data)
         sns.set_theme(style="whitegrid")
-        sns.lineplot(data=df, legend=None).set_title(title)
+        sns.lineplot(data=df).set_title(title)
 
         if show:
             plt.show()

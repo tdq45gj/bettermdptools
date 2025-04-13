@@ -6,6 +6,7 @@ Copyright (c) 2018, Miguel Morales
 All rights reserved.
 https://github.com/mimoralea/gdrl/blob/master/LICENSE
 """
+import time
 
 """
 modified by: John Mansfield
@@ -61,11 +62,16 @@ class Planner:
                 Log of V(s) for each iteration.
             pi : dict
                 Policy mapping states to actions.
+            Time_track : np.ndarray
+                Wall clock time after each iteration.
+
         """
         V = np.zeros(len(self.P), dtype=dtype)
         V_track = np.zeros((n_iters, len(self.P)), dtype=dtype)
+        Time_track = np.zeros(n_iters, dtype=dtype)
         i = 0
         converged = False
+        start_time = time.perf_counter()
         while i < n_iters - 1 and not converged:
             i += 1
             Q = np.zeros((len(self.P), len(self.P[0])), dtype=dtype)
@@ -77,12 +83,14 @@ class Planner:
                 converged = True
             V = np.max(Q, axis=1)
             V_track[i] = V
+            Time_track[i] = time.perf_counter() - start_time
 
         if not converged:
             warnings.warn("Max iterations reached before convergence.  Check n_iters.")
 
+        Time_track[i+1:] = Time_track[i]
         pi = {s: a for s, a in enumerate(np.argmax(Q, axis=1))}
-        return V, V_track, pi
+        return V, V_track, pi, Time_track
 
     def value_iteration_vectorized(
         self, gamma=1.0, n_iters=1000, theta=1e-10, dtype=np.float32
@@ -112,6 +120,8 @@ class Planner:
                 Log of V(s) for each iteration.
             pi : dict
                 Policy mapping states to actions.
+            Time_track : np.ndarray
+                Wall clock time after each iteration.
         """
         S = len(self.P)
         A = len(self.P[0])
@@ -136,11 +146,13 @@ class Planner:
 
         V = np.zeros(S, dtype=dtype)
         V_track = np.zeros((n_iters, S), dtype=dtype)
+        Time_track = np.zeros(n_iters, dtype=dtype)
         converged = False
         # Simpler way to handle done states
         not_done_array = 1 - done_array
         i = 0
         converged = False
+        start_time = time.perf_counter()
         while i < n_iters - 1 and not converged:
             i += 1
             Q = np.sum(
@@ -156,11 +168,13 @@ class Planner:
 
             V = V_new
             V_track[i] = V
+            Time_track[i] = time.perf_counter() - start_time
 
         if not converged:
             warnings.warn("Max iterations reached before convergence. Check n_iters.")
 
-        return V, V_track, dict(enumerate(np.argmax(Q, axis=1)))
+        Time_track[i+1:] = Time_track[i]
+        return V, V_track, dict(enumerate(np.argmax(Q, axis=1))), Time_track
 
     def policy_iteration(self, gamma=1.0, n_iters=50, theta=1e-10, dtype=np.float32):
         """
@@ -184,6 +198,8 @@ class Planner:
                 Log of V(s) for each iteration.
             pi : dict
                 Policy mapping states to actions.
+            Time_track : np.ndarray
+                Wall clock time after each iteration.
         """
         random_actions = np.random.choice(tuple(self.P[0].keys()), len(self.P))
 
@@ -191,8 +207,10 @@ class Planner:
         # initial V to give to `policy_evaluation` for the first time
         V = np.zeros(len(self.P), dtype=dtype)
         V_track = np.zeros((n_iters, len(self.P)), dtype=dtype)
+        Time_track = np.zeros(n_iters, dtype=dtype)
         i = 0
         converged = False
+        start_time = time.perf_counter()
         while i < n_iters - 1 and not converged:
             i += 1
             old_pi = pi
@@ -201,10 +219,12 @@ class Planner:
             pi = self.policy_improvement(V, gamma=gamma, dtype=dtype)
             if old_pi == pi:
                 converged = True
+            Time_track[i] = time.perf_counter() - start_time
 
         if not converged:
             warnings.warn("Max iterations reached before convergence.  Check n_iters.")
-        return V, V_track, pi
+        Time_track[i+1:] = Time_track[i]
+        return V, V_track, pi, Time_track
 
     def policy_evaluation(self, pi, prev_V, gamma=1.0, theta=1e-10, dtype=np.float32):
         """
